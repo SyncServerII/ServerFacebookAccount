@@ -33,13 +33,14 @@ public class FacebookCreds : AccountAPICall,  Account {
         return false
     }
 
-    public weak var delegate:AccountDelegate?
+    weak var delegate:AccountDelegate?
     
     public var accountCreationUser:AccountCreationUser?
     var configuration: FacebookCredsConfiguration?
     
-    required public init?(configuration: Any? = nil) {
+    required public init?(configuration: Any? = nil, delegate: AccountDelegate?) {
         super.init()
+        self.delegate = delegate
         if let configuration = configuration as? FacebookCredsConfiguration {
             self.configuration = configuration
         }
@@ -53,6 +54,9 @@ public class FacebookCreds : AccountAPICall,  Account {
     }
     
     // We're using token generation with Facebook to exchange a short-lived access token for a long-lived one. See https://developers.facebook.com/docs/facebook-login/access-tokens/expiration-and-extension and https://stackoverflow.com/questions/37674620/do-facebook-has-a-refresh-token-of-oauth/37683233
+    // 7/3/20; Hmmm. I'm not sure why I ever do `generateTokes` for Facebook. With Google, I am using this to generate a refresh token from an auth code. Similarly, with Microsoft I use it to generate a refresh token and an access token. In general, for sharing accounts we need access tokens and refresh tokens in an ongoing manner because they are needed for access to files.
+    // For Apple (a sharing account), it helps us do the periodic checks to see if the user is still valid (because we can't do those checks in te Kitura credentials plugin).
+    // I think we don't need to for Facebook. For Facebook, the Kitura-CredentialsFacebook plugin checks with Facebook servers.
     public func needToGenerateTokens(dbCreds:Account? = nil) -> Bool {
         // 11/5/17; See SharingAccountsController.swift comment with the same date for the reason for this conditional compilation. When running the server XCTest cases, make sure to turn on this flag.
 #if DEVTESTING
@@ -123,24 +127,22 @@ public class FacebookCreds : AccountAPICall,  Account {
     }
     
     public static func fromProperties(_ properties: AccountProperties, user:AccountCreationUser?, configuration: Any?, delegate:AccountDelegate?) -> Account? {
-        guard let creds = FacebookCreds(configuration: configuration) else {
+        guard let creds = FacebookCreds(configuration: configuration, delegate: delegate) else {
             return nil
         }
         
         creds.accountCreationUser = user
-        creds.delegate = delegate
         creds.accessToken = properties.properties[ServerConstants.HTTPOAuth2AccessTokenKey] as? String
         return creds
     }
     
     public static func fromJSON(_ json:String, user:AccountCreationUser, configuration: Any?, delegate:AccountDelegate?) throws -> Account? {
         
-        guard let creds = FacebookCreds(configuration: configuration) else {
+        guard let creds = FacebookCreds(configuration: configuration, delegate: delegate) else {
             return nil
         }
         
         creds.accountCreationUser = user
-        creds.delegate = delegate
         
         return creds
     }
